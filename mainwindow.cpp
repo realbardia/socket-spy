@@ -34,7 +34,7 @@ void MainWindow::listen_newConnection_tcp(AsemanAbstractTcpServer::Handle handle
         connect(sslSocket, static_cast<void(QSslSocket::*)(const QList<QSslError> &)>(&QSslSocket::sslErrors), this,
               [=](const QList<QSslError> &errors){
             for(const QSslError &err: errors)
-                qDebug() << __PRETTY_FUNCTION__ << QDateTime::currentDateTime().toString() << err;
+                qDebug() << QDateTime::currentDateTime().toString() << err;
         });
 
         sslSocket->setSocketDescriptor(handle.handle);
