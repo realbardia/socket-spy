@@ -210,7 +210,24 @@
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_5">
          <item>
-          <widget class="QTextBrowser" name="details"/>
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>UTF-8:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QTextBrowser" name="detailsUtf8"/>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_2">
+           <property name="text">
+            <string>Base64:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QTextBrowser" name="detailsBase64"/>
          </item>
          <item>
           <widget class="QGroupBox" name="sendGroup">

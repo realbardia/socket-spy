@@ -234,6 +234,7 @@ void MainWindow::on_listenStart_clicked()
         break;
     }
 
+    ui->listenType->setEnabled(false);
     ui->listenPort->setEnabled(false);
     ui->listenHost->setEnabled(false);
     ui->listenStart->setEnabled(false);
@@ -248,6 +249,7 @@ void MainWindow::on_listenStop_clicked()
         delete mTcpServer;
     }
 
+    ui->listenType->setEnabled(true);
     ui->listenPort->setEnabled(true);
     ui->listenHost->setEnabled(true);
     ui->listenStart->setEnabled(true);
@@ -274,7 +276,8 @@ void MainWindow::on_forwardStop_clicked()
 void MainWindow::on_requests_itemClicked(QTreeWidgetItem *item, int)
 {
     auto data = item->data(0, Qt::UserRole).toByteArray();
-    ui->details->setText( QString::fromUtf8(data) );
+    ui->detailsBase64->setText( data.toBase64() );
+    ui->detailsUtf8->setText( QString::fromUtf8(data) );
     auto socket = mItemSockets.value(item);
 
     if (mSocketMaps.contains(socket))
