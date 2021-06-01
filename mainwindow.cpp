@@ -15,29 +15,29 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::listen_newConnection()
+void MainWindow::listen_newConnection_tcp()
 {
-    auto socket = mServer->nextPendingConnection();
+    auto socket = mTcpServer->nextPendingConnection();
     auto parentItem = addRequestItem(socket, QString());
     addRequestItem(socket, "CONNECTED", parentItem);
 
-    connect(socket, &QTcpSocket::readyRead, this, [this, socket, parentItem](){
+    connect(socket, &QAbstractSocket::readyRead, this, [this, socket, parentItem](){
         addRequestItem(socket, "INCOMING", parentItem);
     });
-    connect(socket, &QTcpSocket::connected, this, [this, socket, parentItem](){
+    connect(socket, &QAbstractSocket::connected, this, [this, socket, parentItem](){
         addRequestItem(socket, "CONNECTED", parentItem);
     });
-    connect(socket, &QTcpSocket::disconnected, this, [this, socket, parentItem](){
+    connect(socket, &QAbstractSocket::disconnected, this, [this, socket, parentItem](){
         addRequestItem(socket, "DISCONNECTED", parentItem);
         socket->deleteLater();
     });
-    connect(socket, &QTcpSocket::stateChanged, this, [this, socket, parentItem](QAbstractSocket::SocketState state){
+    connect(socket, &QAbstractSocket::stateChanged, this, [this, socket, parentItem](QAbstractSocket::SocketState state){
         QVariant var = QVariant::fromValue(state);
         var.convert(QVariant::String);
 
         addRequestItem(socket, "STATE", parentItem, var.toString().toUtf8());
     });
-    connect(socket, &QTcpSocket::errorOccurred, this, [this, socket, parentItem](QAbstractSocket::SocketError err){
+    connect(socket, &QAbstractSocket::errorOccurred, this, [this, socket, parentItem](QAbstractSocket::SocketError err){
         QVariant var = QVariant::fromValue(err);
         var.convert(QVariant::String);
 
@@ -47,14 +47,26 @@ void MainWindow::listen_newConnection()
     mSocketMaps[socket] = createForwardSocket(socket);
 }
 
-QTreeWidgetItem *MainWindow::addRequestItem(QTcpSocket *socket, const QString &type, QTreeWidgetItem *parentItem, const QByteArray &extra)
+void MainWindow::listen_newConnection_udp()
+{
+    QByteArray datagram;
+    while (mUdpServer->hasPendingDatagrams())
+    {
+        datagram.resize(int(mUdpServer->pendingDatagramSize()));
+        mUdpServer->readDatagram(datagram.data(), datagram.size());
+        qDebug() << QString("Received IPv4 datagram: \"%1\"").arg(datagram.constData());
+    }
+}
+
+QTreeWidgetItem *MainWindow::addRequestItem(QAbstractSocket *socket, const QString &type, QTreeWidgetItem *parentItem, const QByteArray &extra)
 {
     auto item = new QTreeWidgetItem;
     item->setText(0, socket->peerAddress().toString());
     item->setText(1, QString::number(socket->socketDescriptor()));
     item->setText(2, QDateTime::currentDateTime().toString("hh:mm:ss.zzz"));
     item->setText(3, type);
-    item->setData(0, Qt::UserRole+1, QVariant::fromValue(socket));
+
+    mItemSockets[item] = socket;
 
     if (parentItem)
     {
@@ -71,35 +83,35 @@ QTreeWidgetItem *MainWindow::addRequestItem(QTcpSocket *socket, const QString &t
     return item;
 }
 
-QTcpSocket *MainWindow::createForwardSocket(QTcpSocket *_s)
+QAbstractSocket *MainWindow::createForwardSocket(QAbstractSocket *_s)
 {
     if (ui->forwardStart->isEnabled())
         return Q_NULLPTR;
 
-    QPointer<QTcpSocket> socket = _s;
-    QPointer<QTcpSocket> forward = new QTcpSocket(this);
+    QPointer<QAbstractSocket> socket = _s;
+    QPointer<QAbstractSocket> forward = new QTcpSocket(this);
 
-    connect(socket, &QTcpSocket::readyRead, this, [this, socket, forward](){
+    connect(socket, &QAbstractSocket::readyRead, this, [this, socket, forward](){
         if (ui->forwardStart->isEnabled()) return;
         if (!forward || !socket)
             return;
 
         forward->write(socket->readAll());
     });
-    connect(socket, &QTcpSocket::disconnected, this, [this, socket, forward](){
+    connect(socket, &QAbstractSocket::disconnected, this, [this, socket, forward](){
         if (ui->forwardStart->isEnabled()) return;
         if (forward) forward->disconnectFromHost();
         if (socket) socket->deleteLater();
     });
 
-    connect(forward, &QTcpSocket::readyRead, this, [this, socket, forward](){
+    connect(forward, &QAbstractSocket::readyRead, this, [this, socket, forward](){
         if (ui->forwardStart->isEnabled()) return;
         if (!forward || !socket)
             return;
 
         socket->write(forward->readAll());
     });
-    connect(forward, &QTcpSocket::disconnected, this, [this, socket, forward](){
+    connect(forward, &QAbstractSocket::disconnected, this, [this, socket, forward](){
         if (ui->forwardStart->isEnabled()) return;
         if (socket) socket->disconnectFromHost();
         if (forward) forward->deleteLater();
@@ -117,22 +129,44 @@ void MainWindow::listen_acceptError(QAbstractSocket::SocketError socketError)
 
 void MainWindow::on_listenStart_clicked()
 {
-    if (mServer)
+    if (mTcpServer)
     {
-        mServer->close();
-        delete mServer;
+        mTcpServer->close();
+        delete mTcpServer;
     }
-
-    mServer = new QTcpServer(this);
-
-    connect(mServer, &QTcpServer::newConnection, this, &MainWindow::listen_newConnection);
-    connect(mServer, &QTcpServer::acceptError, this, &MainWindow::listen_acceptError);
+    if (mUdpServer)
+    {
+        mUdpServer->close();
+        delete mUdpServer;
+    }
 
     auto adrs = ui->listenHost->text();
     if (adrs.isEmpty())
         adrs = QStringLiteral("127.0.0.1");
 
-    mServer->listen(QHostAddress(adrs), ui->listenPort->value());
+    switch (ui->listenType->currentIndex())
+    {
+    case 0: // TCP
+    {
+        mTcpServer = new QTcpServer(this);
+
+        connect(mTcpServer, &QTcpServer::newConnection, this, &MainWindow::listen_newConnection_tcp);
+        connect(mTcpServer, &QTcpServer::acceptError, this, &MainWindow::listen_acceptError);
+
+        mTcpServer->listen(QHostAddress(adrs), ui->listenPort->value());
+    }
+        break;
+
+    case 1: // UDP
+    {
+        mUdpServer = new QUdpSocket(this);
+
+        connect(mUdpServer, &QUdpSocket::readyRead, this, &MainWindow::listen_newConnection_udp);
+
+        mUdpServer->bind(QHostAddress(adrs), ui->listenPort->value(), QUdpSocket::ShareAddress);
+    }
+        break;
+    }
 
     ui->listenPort->setEnabled(false);
     ui->listenHost->setEnabled(false);
@@ -142,10 +176,10 @@ void MainWindow::on_listenStart_clicked()
 
 void MainWindow::on_listenStop_clicked()
 {
-    if (mServer)
+    if (mTcpServer)
     {
-        mServer->close();
-        delete mServer;
+        mTcpServer->close();
+        delete mTcpServer;
     }
 
     ui->listenPort->setEnabled(true);
@@ -175,7 +209,7 @@ void MainWindow::on_requests_itemClicked(QTreeWidgetItem *item, int)
 {
     auto data = item->data(0, Qt::UserRole).toByteArray();
     ui->details->setText( QString::fromUtf8(data) );
-    auto socket = item->data(0, Qt::UserRole+1).value<QTcpSocket*>();
+    auto socket = mItemSockets.value(item);
 
     if (mSocketMaps.contains(socket))
         mSelectedSocket = socket;

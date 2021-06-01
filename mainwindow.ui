@@ -26,6 +26,20 @@
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout">
            <item>
+            <widget class="QComboBox" name="listenType">
+             <item>
+              <property name="text">
+               <string>TCP</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>UDP</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+           <item>
             <widget class="QLineEdit" name="listenHost">
              <property name="placeholderText">
               <string>Host Address</string>

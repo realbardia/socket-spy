@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QUdpSocket>
 #include <QSslSocket>
 #include <QPointer>
 #include <QTreeWidgetItem>
@@ -21,7 +22,8 @@ public:
     ~MainWindow();
 
 private slots:
-    void listen_newConnection();
+    void listen_newConnection_tcp();
+    void listen_newConnection_udp();
     void listen_acceptError(QAbstractSocket::SocketError socketError);
 
     void on_listenStart_clicked();
@@ -33,13 +35,15 @@ private slots:
     void on_sendToServerBtn_clicked();
 
 protected:
-    QTreeWidgetItem *addRequestItem(QTcpSocket *socket, const QString &type, QTreeWidgetItem *parentItem = Q_NULLPTR, const QByteArray &extra = QByteArray());
-    QTcpSocket *createForwardSocket(QTcpSocket *socket);
+    QTreeWidgetItem *addRequestItem(QAbstractSocket *socket, const QString &type, QTreeWidgetItem *parentItem = Q_NULLPTR, const QByteArray &extra = QByteArray());
+    QAbstractSocket *createForwardSocket(QAbstractSocket *socket);
 
 private:
     Ui::MainWindow *ui;
-    QPointer<QTcpServer> mServer;
-    QPointer<QTcpSocket> mSelectedSocket;
-    QHash<QTcpSocket*, QPointer<QTcpSocket>> mSocketMaps;
+    QPointer<QTcpServer> mTcpServer;
+    QPointer<QUdpSocket> mUdpServer;
+    QPointer<QAbstractSocket> mSelectedSocket;
+    QHash<QAbstractSocket*, QPointer<QAbstractSocket>> mSocketMaps;
+    QHash<QTreeWidgetItem*, QPointer<QAbstractSocket>> mItemSockets;
 };
 #endif // MAINWINDOW_H
