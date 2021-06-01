@@ -70,6 +70,29 @@ void MainWindow::listen_newConnection_tcp(AsemanAbstractTcpServer::Handle handle
         addRequestItem(socket, "STATE", parentItem, var.toString().toUtf8());
     });
 
+    if(handle.sslProtocol != QSsl::UnknownProtocol)
+    {
+        auto *ssl = static_cast<QSslSocket*>(socket);
+        connect(ssl, &QSslSocket::encrypted, this, [this, socket, parentItem](){
+            addRequestItem(socket, "ENCRYPTED", parentItem);
+        });
+        connect(ssl, &QSslSocket::peerVerifyError, this, [this, socket, parentItem](const QSslError &error){
+            QVariant var = QVariant::fromValue(error);
+            var.convert(QVariant::String);
+
+            addRequestItem(socket, "SSL_PEER_ERROR", parentItem, var.toString().toUtf8());
+        });
+        connect(ssl, static_cast<void(QSslSocket::*)(const QList<QSslError> &)>(&QSslSocket::sslErrors), this, [this, socket, parentItem](const QList<QSslError> &errors){
+            for (auto error: errors)
+            {
+                QVariant var = QVariant::fromValue(error);
+                var.convert(QVariant::String);
+
+                addRequestItem(socket, "SSL_PEER_ERROR", parentItem, var.toString().toUtf8());
+            }
+        });
+    }
+
     mSocketMaps[socket] = createForwardSocket(socket);
 }
 
