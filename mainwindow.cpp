@@ -49,6 +49,7 @@ void MainWindow::listen_newConnection_tcp()
 
 void MainWindow::listen_newConnection_udp()
 {
+    qDebug() << "INCOMMING UDP";
     QByteArray datagram;
     while (mUdpServer->hasPendingDatagrams())
     {
