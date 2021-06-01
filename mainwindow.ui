@@ -34,6 +34,11 @@
              </item>
              <item>
               <property name="text">
+               <string>SSL</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
                <string>UDP</string>
               </property>
              </item>

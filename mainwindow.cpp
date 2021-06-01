@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "aseman/asemansslserver.h"
+#include "aseman/asemantcpserver.h"
 
 #include <QHostAddress>
 
@@ -15,9 +17,33 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::listen_newConnection_tcp()
+void MainWindow::listen_newConnection_tcp(AsemanAbstractTcpServer::Handle handle)
 {
-    auto socket = mTcpServer->nextPendingConnection();
+    QTcpSocket *socket;
+    if(handle.sslProtocol == QSsl::UnknownProtocol)
+    {
+        socket = new QTcpSocket(this);
+        socket->setSocketDescriptor(handle.handle);
+    }
+    else
+    {
+        auto sslSocket = new QSslSocket(this);
+        socket = sslSocket;
+
+        connect(sslSocket, &QSslSocket::encrypted, sslSocket, &QSslSocket::readyRead);
+        connect(sslSocket, static_cast<void(QSslSocket::*)(const QList<QSslError> &)>(&QSslSocket::sslErrors), this,
+              [=](const QList<QSslError> &errors){
+            for(const QSslError &err: errors)
+                qDebug() << __PRETTY_FUNCTION__ << QDateTime::currentDateTime().toString() << err;
+        });
+
+        sslSocket->setSocketDescriptor(handle.handle);
+        sslSocket->setLocalCertificate(handle.sslLocalCertificate);
+        sslSocket->setPrivateKey(handle.sslPrivateKey);
+        sslSocket->setProtocol(handle.sslProtocol);
+        sslSocket->startServerEncryption();
+    }
+
     auto parentItem = addRequestItem(socket, QString());
     addRequestItem(socket, "CONNECTED", parentItem);
 
@@ -149,16 +175,32 @@ void MainWindow::on_listenStart_clicked()
     {
     case 0: // TCP
     {
-        mTcpServer = new QTcpServer(this);
+        mTcpServer = new AsemanTcpServer(this);
 
-        connect(mTcpServer, &QTcpServer::newConnection, this, &MainWindow::listen_newConnection_tcp);
-        connect(mTcpServer, &QTcpServer::acceptError, this, &MainWindow::listen_acceptError);
+        connect(mTcpServer, &AsemanTcpServer::newConnection, this, &MainWindow::listen_newConnection_tcp);
+        connect(mTcpServer, &AsemanTcpServer::acceptError, this, &MainWindow::listen_acceptError);
 
         mTcpServer->listen(QHostAddress(adrs), ui->listenPort->value());
     }
         break;
 
-    case 1: // UDP
+    case 1: // SSL
+    {
+        auto ssl = new AsemanSslServer(this);
+        ssl->setSslLocalCertificate(":/keys/server.crt");
+        ssl->setSslPrivateKey(":/keys/server.key");
+        ssl->setSslProtocol(QSsl::TlsV1_2);
+
+        mTcpServer = ssl;
+
+        connect(mTcpServer, &AsemanSslServer::newConnection, this, &MainWindow::listen_newConnection_tcp);
+        connect(mTcpServer, &AsemanSslServer::acceptError, this, &MainWindow::listen_acceptError);
+
+        mTcpServer->listen(QHostAddress(adrs), ui->listenPort->value());
+    }
+        break;
+
+    case 2: // UDP
     {
         mUdpServer = new QUdpSocket(this);
 
