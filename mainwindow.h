@@ -35,10 +35,17 @@ private slots:
     void on_requests_itemClicked(QTreeWidgetItem *item, int column);
     void on_sendToClientBtn_clicked();
     void on_sendToServerBtn_clicked();
+    void on_saveBtn_clicked();
+    void on_restoreBtn_clicked();
+    void on_clearBtn_clicked();
+    void on_requests_currentItemChanged(QTreeWidgetItem *current, QTreeWidgetItem *previous);
 
 protected:
-    QTreeWidgetItem *addRequestItem(QAbstractSocket *socket, const QString &type, QTreeWidgetItem *parentItem = Q_NULLPTR, const QByteArray &extra = QByteArray());
-    QAbstractSocket *createForwardSocket(QAbstractSocket *socket);
+    QTreeWidgetItem *addRequestItem(QAbstractSocket *socket, const QString &type, QTreeWidgetItem *parentItem = Q_NULLPTR, const QByteArray &extra = QByteArray(), QByteArray *dataRes = Q_NULLPTR);
+    QAbstractSocket *createForwardSocket(QAbstractSocket *socket, QTreeWidgetItem *parentItem);
+
+    QVariantList saveData(QTreeWidgetItem *item = Q_NULLPTR);
+    void restoreData(const QVariantList list, QTreeWidgetItem *item = Q_NULLPTR);
 
 private:
     Ui::MainWindow *ui;
