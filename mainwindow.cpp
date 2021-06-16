@@ -144,6 +144,7 @@ QTreeWidgetItem *MainWindow::addRequestItem(QAbstractSocket *socket, const QStri
         item->setData(0, Qt::UserRole, data);
 
         parentItem->insertChild(0, item);
+        ui->requests->expandItem(parentItem);
     }
     else
         ui->requests->insertTopLevelItem(0, item);
@@ -214,7 +215,10 @@ void MainWindow::restoreData(const QVariantList list, QTreeWidgetItem *item)
         }
 
         if (item)
+        {
             item->addChild(c);
+            ui->requests->expandItem(item);
+        }
         else
             ui->requests->addTopLevelItem(c);
 
@@ -378,12 +382,17 @@ void MainWindow::on_requests_itemClicked(QTreeWidgetItem *item, int)
 
     QStringList streamList;
     QDataStream stream(data);
-    while (!stream.atEnd())
+
+    qint32 length;
+    stream >> length;
+
+    if (length)
     {
-        QByteArray s;
-        stream >> s;
-        streamList << QString::fromUtf8(s);
+        streamList << QString::number(length);
+        streamList << QString::fromUtf8(data.mid(4));
     }
+    else
+        streamList << data;
 
     ui->detailsBase64->setText( data.toBase64() );
     ui->detailsUtf8->setText( QString(data) );
